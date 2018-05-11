@@ -34,8 +34,8 @@
               b-form-group(label="Password")
                 b-form-input(v-model="sendToken.password")
               b-form-group(label="Result")
-                b-form-textarea(v-model="sendToken.result" rows="10")
-              b-button(primary @click="transferTokens(sendToken.from, sendToken.to, sendToken.amount, sendToken.password)") Claim
+                b-form-textarea(key="send" v-model="sendToken.result" rows="10")
+              b-button(primary @click="transferTokens(sendToken.from, sendToken.to, sendToken.amount, sendToken.password)") Send
           b-tab(title="Issue tokens")
             h3 Type account name, amount to issue and and press "Claim"
             b-form
@@ -44,11 +44,11 @@
               b-form-group(label="Amount (N CUR)")
                 b-form-input(v-model="issueToken.amount")
               b-form-group(label="Result")
-                b-form-textarea(v-model="issueToken.result" rows="10")
+                b-form-textarea(key="issue" v-model="issueToken.result" rows="10")
               b-button(primary @click="issueTokens(issueToken.name, issueToken.amount)") Claim
           b-tab(title="Account info")
             h3 Type account name and press "Fetch"
-            b-form
+            b-form(key="info")
               b-form-group(label="Existing account name")
                 b-form-input(v-model="accountInfo.name")
               b-form-group(label="Account information")
@@ -56,12 +56,12 @@
               b-button(primary @click="getAccountInfo(accountInfo.name)") Fetch info
           b-tab(title="Account balance")
             h3 Type account name and press "Fetch"
-            b-form
+            b-form(key="balance")
               b-form-group(label="Existing account name")
-                b-form-input(v-model="accountInfo.name")
+                b-form-input(v-model="accountBalance.name")
               b-form-group(label="Account balance")
-                b-form-textarea(v-model="accountInfo.info" rows="10")
-              b-button(primary @click="getAccountBalance(accountInfo.name)") Fetch balance
+                b-form-textarea(v-model="accountBalance.info" rows="10")
+              b-button(primary @click="getAccountBalance(accountBalance.name)") Fetch balance
           b-tab(title="Account history")
             h3 Type account name and press "Fetch"
             b-form
@@ -94,6 +94,10 @@ export default {
         result: ''
       },
       accountInfo: {
+        name: '',
+        info: ''
+      },
+      accountBalance: {
         name: '',
         info: ''
       },
@@ -148,12 +152,16 @@ export default {
 
     async getAccountBalance (name) {
       const result = await this.eos.getCurrencyBalance(this.CONTRACT_NAME, name)
-      this.accountInfo.info = JSON.stringify(result, null, 2)
+      this.accountBalance.info = JSON.stringify(result, null, 2)
     },
 
     async issueTokens (name, amount) {
-      let currency = await this.eos.contract(this.CONTRACT_NAME)
-      const result = await currency.issue(name, amount, '', {authorization: 'currency'})
+      const result = await this.eos.transaction(
+        this.CONTRACT_NAME,
+        currency => {
+          currency.issue(name, amount, '', {authorization: this.CONTRACT_NAME})
+        }
+      )
       this.issueToken.result = JSON.stringify(result, null, 2)
     },
 
@@ -163,9 +171,15 @@ export default {
     },
 
     async transferTokens(from, to, amount, password) {
+      // provide issuer password
       this.eos = window.EOS = Eos.Localnet({keyProvider: password})
-      let currency = await this.eos.contract(this.CONTRACT_NAME)
-      const result = await currency.transfer(from, to, amount, 'memo')
+      const result = await this.eos.transaction(
+        this.CONTRACT_NAME,
+        currency => {
+          currency.transfer(from, to, amount, 'memo')
+        }
+      )
+      // reset root password
       this.sendToken.result = JSON.stringify(result, null, 2)
       this.eos = window.EOS = Eos.Localnet({keyProvider: this.masterPrivate})
     }
