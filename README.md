@@ -1,6 +1,6 @@
 # eos-test
 
-> A Vue.js project
+> A simple VueJS project to test some core functions of [eosjs](https://github.com/EOSIO/eosjs) library
 
 ## Build Setup
 
